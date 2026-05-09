@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Bayesian AB 胜出概率计算器</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  </head>
+  <body>
+    <main class="container">
+      <h1>Bayesian AB 胜出概率计算器</h1>
+
+      <section class="panel">
+        <h2>0) 使用备注</h2>
+        <div class="sample-tip">
+          1. 本网页仅限于使用
+          <a href="https://ta-dashboard.hellotalk8.com/#/panel/panel/12_14396" target="_blank" rel="noopener noreferrer"
+            >商业化AB实验报表</a
+          >
+          时计算胜出概率，无法生成实验结果。
+        </div>
+        <div class="sample-tip">
+          2. 操作步骤：进入商业化AB实验报表计算出实验结果 &gt; 点击下载表格 &gt; 将下载的内容上传到下方 &gt;
+          按照要求开始计算
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>1) 上传原始汇总表</h2>
+        <input id="fileInput" class="hidden-file-input" type="file" accept=".csv,.xlsx,.xls" multiple />
+        <div class="upload-row">
+          <button id="filePickBtn" type="button">选择文件</button>
+          <span id="fileNameText">未选择任何文件</span>
+        </div>
+        <div class="sample-tip">
+          支持一次选择多个文件；将按文件名分别输出结果。参考列名：<code>@实验分组,指标类型,样本人数,D1,D3,D7,周期均值</code>
+        </div>
+      </section>
+      <div id="status" class="status status-info">等待上传文件...</div>
+
+      <section class="panel">
+        <h2>2) 参数设置</h2>
+        <div class="form-row">
+          <label for="sampleCount">模拟次数（MSamples）</label>
+          <input id="sampleCount" type="number" min="1000" step="1000" value="100000" />
+        </div>
+        <div class="param-tip">
+          怎么选这个值：<code>10000</code> 更快但波动更大；<code>50000</code> 速度与稳定性平衡；
+          <code>100000</code> 更稳定（推荐）；<code>200000+</code> 最稳但更慢。
+        </div>
+        <button id="runBtn">开始计算</button>
+      </section>
+
+      <section class="panel result-panel">
+        <h2>3) 计算结果</h2>
+        <div class="column-width-control">
+          <label for="metricColWidthRange">指标列宽度</label>
+          <input id="metricColWidthRange" type="range" min="120" max="320" step="10" value="160" />
+          <span id="metricColWidthValue">160px</span>
+        </div>
+        <div id="resultContainer"></div>
+      </section>
+
+      <section class="panel">
+        <h2>4) 指标口径说明</h2>
+        <div class="table-wrap">
+          <table class="rule-table">
+            <thead>
+              <tr>
+                <th>指标</th>
+                <th>定义</th>
+                <th>胜出概率计算方式</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>VIP新购购买率</td>
+                <td><code>VIP新购购买人数 / 样本人数</code></td>
+                <td>分子 = <code>样本人数 × VIP新购购买率</code>；分母 = <code>样本人数</code></td>
+              </tr>
+              <tr>
+                <td>VIP新购ARPPU</td>
+                <td><code>VIP新购总收入 / VIP新购购买人数</code></td>
+                <td>分母 = <code>样本人数</code>；转化人数 = <code>VIP新购购买人数</code>；转化收益 = <code>VIP新购总收入</code></td>
+              </tr>
+              <tr>
+                <td>VIP新购ARPU</td>
+                <td><code>VIP新购总收入 / 样本人数</code></td>
+                <td>分母 = <code>样本人数</code>；转化人数 = <code>VIP新购购买人数</code>；转化收益 = <code>VIP新购总收入</code></td>
+              </tr>
+              <tr>
+                <td>D1/D7留存率</td>
+                <td><code>D1/D7留存人数 / 样本人数</code></td>
+                <td>分子 = <code>样本人数 × D1/D7留存率</code>；分母 = <code>样本人数</code></td>
+              </tr>
+              <tr>
+                <td>发起新聊天D0回复率(样本)</td>
+                <td>原始表该指标的率值</td>
+                <td>分子 = <code>样本人数 × 发起新聊天D0回复率</code>；分母 = <code>样本人数</code></td>
+              </tr>
+              <tr>
+                <td>发起新聊天率(样本)</td>
+                <td>原始表该指标的率值</td>
+                <td>分子 = <code>样本人数 × 发起新聊天率</code>；分母 = <code>样本人数</code></td>
+              </tr>
+              <tr>
+                <td>人均主动ABA数(样本)</td>
+                <td>原始表该指标的人均值</td>
+                <td>分母 = <code>样本人数</code>；转化人数 = <code>达成主动ABA人数</code>；转化收益 = <code>人均主动ABA数 × 样本人数</code></td>
+              </tr>
+              <tr>
+                <td>人均发起聊天数(样本)</td>
+                <td>原始表该指标的人均值</td>
+                <td>分母 = <code>样本人数</code>；转化人数 = <code>发起新聊天率 × 样本人数</code>；转化收益 = <code>人均发起聊天数 × 样本人数</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
