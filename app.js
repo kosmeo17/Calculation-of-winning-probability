@@ -663,6 +663,59 @@ function getPurchaseCountForGroup(group) {
   return NaN;
 }
 
+/** 从指标名去掉尾部 ARPPU/ARPU，用于匹配同系列的「人数/率/收入」列（忽略空格差异）。 */
+function getArpuStemInfo(label) {
+  const s = String(label ?? "").trim();
+  let m = s.match(/^(.+?)\s*ARPPU\s*$/i);
+  if (m) return { stem: m[1].trim(), kind: "arppu" };
+  m = s.match(/^(.+?)\s*ARPU\s*$/i);
+  if (m) return { stem: m[1].trim(), kind: "arpu" };
+  return null;
+}
+
+function isTerminalArpuFamilyKey(k) {
+  const t = String(k ?? "")
+    .trim()
+    .replace(/\s/g, "");
+  return /ARPPU$/i.test(t) || /ARPU$/i.test(t);
+}
+
+function stemMatchingKeys(stem) {
+  const compactStem = stem.replace(/\s/g, "");
+  return [...currentMetricMap().keys()]
+    .filter((k) => {
+      if (isTerminalArpuFamilyKey(k)) return false;
+      const compactK = k.replace(/\s/g, "");
+      return k.startsWith(stem) || compactK.startsWith(compactStem);
+    })
+    .sort((a, b) => b.length - a.length);
+}
+
+function getMetricPeriodForKey(key, group) {
+  if (!key) return NaN;
+  return currentMetricMap().get(key)?.get(group)?.period;
+}
+
+/** 与某 ARPU/ARPPU 前缀同系列的转化人数：优先「人数」列，否则 样本人数×同系列「率」，再否则 收入/ARPPU。 */
+function getPurchaseCountForStem(group, stem) {
+  const keys = stemMatchingKeys(stem);
+  const countKey = keys.find((k) => /人数/.test(k) && !/率/.test(k));
+  if (countKey) {
+    const v = getMetricPeriodForKey(countKey, group);
+    if (Number.isFinite(v)) return v;
+  }
+  const rateKey = keys.find((k) => /率/.test(k));
+  const sample = getGroupBaseSample(group);
+  const rate = rateKey ? getMetricPeriodForKey(rateKey, group) : NaN;
+  if (Number.isFinite(rate) && Number.isFinite(sample)) return rate * sample;
+  const revKey = keys.find((k) => /收入|金额/.test(k));
+  const arppuKey = keys.find((k) => /ARPPU/i.test(k));
+  const rev = revKey ? getMetricPeriodForKey(revKey, group) : NaN;
+  const arppu = arppuKey ? getMetricPeriodForKey(arppuKey, group) : NaN;
+  if (Number.isFinite(rev) && Number.isFinite(arppu) && arppu > 0) return rev / arppu;
+  return NaN;
+}
+
 function findMetricKeyByMatcher(matcher) {
   const keys = [...currentMetricMap().keys()];
   return keys.find((k) => matcher.test(k)) || null;
@@ -746,6 +799,7 @@ function getMetricValueByGroup(outputRow, group) {
 function shouldComputeStats(outputRow) {
   if (outputRow.type === "sample") return false;
   const label = outputRow.label;
+  // 名称含「率」的率值类（含点击率、续费率等）；ARPPU/ARPU 行本身不含独立「率」字则走均值类
   const rateLike = /率/.test(label) || /^D[17]留存率$/.test(label);
   const meanLike = /ARPU|ARPPU|人均|均值/i.test(label);
   return rateLike || meanLike;
@@ -766,6 +820,7 @@ function calcWinProbDetail(outputRow, controlGroup, expGroup, mSamples) {
   const arpuLike = /ARPU/i.test(label) && !arppuLike;
   const repeatRuns = getProbabilityRepeatRuns(mSamples);
 
+  // 率值类：分子≈成功次数，分母=样本人数；新增名称带「率」的指标会自动走此分支
   if (rateLike) {
     const successA = valA * rowA.sample;
     const successB = valB * rowB.sample;
@@ -846,10 +901,20 @@ function calcWinProbDetail(outputRow, controlGroup, expGroup, mSamples) {
   if (arppuLike || arpuLike) {
     const totalA = getGroupBaseSample(controlGroup);
     const totalB = getGroupBaseSample(expGroup);
-    const successA = getPurchaseCountForGroup(controlGroup);
-    const successB = getPurchaseCountForGroup(expGroup);
+    const stemInfo = getArpuStemInfo(label);
+    const successA = stemInfo
+      ? getPurchaseCountForStem(controlGroup, stemInfo.stem)
+      : getPurchaseCountForGroup(controlGroup);
+    const successB = stemInfo
+      ? getPurchaseCountForStem(expGroup, stemInfo.stem)
+      : getPurchaseCountForGroup(expGroup);
     if (!Number.isFinite(successA) || !Number.isFinite(successB)) {
-      return { prob: NaN, reason: "缺少依赖指标: VIP新购购买人数/购买率/总收入/ARPPU" };
+      return {
+        prob: NaN,
+        reason: stemInfo
+          ? `缺少依赖指标: 与「${stemInfo.stem}」同系列的购买/订阅人数、率或收入`
+          : "缺少依赖指标: VIP新购购买人数/购买率/总收入/ARPPU",
+      };
     }
     if (
       !Number.isFinite(totalA) ||

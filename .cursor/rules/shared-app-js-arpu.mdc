@@ -1,12 +1,35 @@
 ---
-description: Shared app.js with ARPU计算 — single canonical copy + symlink mirror
-globs: app.js
+description: Shared frontend with ARPU计算 — canonical repo + symlink mirror
+globs: app.js,index.html,styles.css,scripts/sync-arpu-mirror.sh
 alwaysApply: false
 ---
 
-# `app.js` 与 ARPU计算 同步
+# 与 ARPU计算 共用前端文件
 
-- **唯一源码**：`/Users/sequioa/Desktop/cursor/Calculation-of-winning-probability/app.js`（本仓库）。Bayesian AB / 多实验组 / holdback 基准逻辑只在这里改。
-- **镜像**：`/Users/sequioa/Desktop/cursor/ARPU计算/app.js` 为指向上述文件的 **符号链接**，修改本文件后 ARPU 仓库会自动一致，勿在 ARPU 侧单独复制一份 `app.js`。
-- **对比规则**：无 `holdback` 时基准为 **control**，所有识别为实验组的 arm 各自相对 control 展示 uplift 与胜出概率；存在 `holdback` 时基准为 **holdback**，其余含 control 在内的所有组均相对 holdback。
-- 若 symlink 丢失（例如解压备份目录），可运行 `./scripts/sync-app-js-to-arpu.sh` 恢复镜像或重新执行：`ln -sf ../Calculation-of-winning-probability/app.js ../ARPU计算/app.js`（路径按实际目录调整）。
+**唯一源码目录**：本仓库 `Calculation-of-winning-probability/`。
+
+**镜像**（`../ARPU计算/` 下应为符号链接，勿在 ARPU 侧维护独立副本）：
+
+| 文件 | 说明 |
+|------|------|
+| `app.js` | 计算与表格逻辑 |
+| `index.html` | 页面与指标口径说明 |
+| `styles.css` | 样式 |
+
+**恢复 / 初次对齐镜像**（在本仓库根目录）：
+
+```bash
+./scripts/sync-arpu-mirror.sh
+```
+
+若 ARPU 目录里还是**普通文件**而非链接，脚本会跳过并提示；要改成链接并覆盖本地文件：
+
+```bash
+FORCE=1 ./scripts/sync-arpu-mirror.sh
+```
+
+旧脚本名 `./scripts/sync-app-js-to-arpu.sh` 与上面等价。
+
+**业务规则简述**：无 `holdback` → 基准为 **control**；有 `holdback` → 基准为 **holdback**，其余组（含 control）均与其对比。
+
+**协作注意**：Git 会记录 symlink；他人克隆后若路径不是 `cursor/ARPU计算` 与 `cursor/Calculation-of-winning-probability` 并列，需在本地改相对路径或重新执行 `FORCE=1 ./scripts/sync-arpu-mirror.sh`。

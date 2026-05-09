@@ -76,6 +76,15 @@
             </thead>
             <tbody>
               <tr>
+                <td colspan="3">
+                  <strong>自动归类（便于持续加指标）</strong>：<strong>率值类</strong>——指标名含「率」或表内为 D1/D7
+                  留存率时，胜出概率按「成功次数 / 样本人数」的二项模型（双 Beta）比较；成功次数优先取同指标对应的「人数」列（若有），否则取
+                  <code>样本人数 × 该指标率值</code>。<strong>ARPU / ARPPU 类</strong>——指标名以
+                  <code>ARPU</code> 或 <code>ARPPU</code> 结尾时，与同名称前缀下的「人数 / 率 / 收入」列联动，计算方式与同表
+                  VIP 新购 ARPU / ARPPU 一致（见下）。
+                </td>
+              </tr>
+              <tr>
                 <td>VIP新购购买率</td>
                 <td><code>VIP新购购买人数 / 样本人数</code></td>
                 <td>分子 = <code>样本人数 × VIP新购购买率</code>；分母 = <code>样本人数</code></td>
@@ -114,6 +123,98 @@
                 <td>人均发起聊天数(样本)</td>
                 <td>原始表该指标的人均值</td>
                 <td>分母 = <code>样本人数</code>；转化人数 = <code>发起新聊天率 × 样本人数</code>；转化收益 = <code>人均发起聊天数 × 样本人数</code></td>
+              </tr>
+              <tr>
+                <td>VIP取消订阅率</td>
+                <td>原始表该指标的率值（或 <code>VIP取消订阅人数 / 样本人数</code>）</td>
+                <td>
+                  分子 = <code>VIP取消订阅人数</code> 或 <code>样本人数 × VIP取消订阅率</code>；分母 =
+                  <code>样本人数</code>
+                </td>
+              </tr>
+              <tr>
+                <td>VIP 实验期间新购买-取消订阅率(样本)</td>
+                <td>原始表该指标的率值（或对应人数 / 样本人数）</td>
+                <td>
+                  分子 = <code>VIP 实验期间新购买-取消订阅人数</code> 或
+                  <code>样本人数 × VIP 实验期间新购买-取消订阅率</code>；分母 = <code>样本人数</code>
+                </td>
+              </tr>
+              <tr>
+                <td>VIP 进组1天内新购买-取消订阅率(样本)</td>
+                <td>原始表该指标的率值（或对应人数 / 样本人数）</td>
+                <td>
+                  分子 = <code>VIP 进组1天内新购买-取消订阅人数</code> 或
+                  <code>样本人数 × VIP 进组1天内新购买-取消订阅率</code>；分母 = <code>样本人数</code>
+                </td>
+              </tr>
+              <tr>
+                <td>免费试用领取率</td>
+                <td>原始表该指标的率值（或 <code>免费试用领取人数 / 样本人数</code>）</td>
+                <td>
+                  分子 = <code>免费试用领取人数</code> 或 <code>样本人数 × 免费试用领取率</code>；分母 =
+                  <code>样本人数</code>
+                </td>
+              </tr>
+              <tr>
+                <td>免费试用转订阅ARPU</td>
+                <td><code>免费试用转订阅收入 / 样本人数</code>（表内口径）</td>
+                <td>
+                  分母 = <code>样本人数</code>；转化人数 = <code>免费试用转订阅人数</code> 或
+                  <code>样本人数 × 免费试用转订阅率</code>；转化收益 = <code>免费试用转订阅收入</code>
+                </td>
+              </tr>
+              <tr>
+                <td>免费试用转订阅率</td>
+                <td>原始表该指标的率值（或 <code>免费试用转订阅人数 / 样本人数</code>）</td>
+                <td>
+                  分子 = <code>免费试用转订阅人数</code> 或 <code>样本人数 × 免费试用转订阅率</code>；分母 =
+                  <code>样本人数</code>
+                </td>
+              </tr>
+              <tr>
+                <td>VIP续费率</td>
+                <td>原始表该指标的率值（人数/样本人数）</td>
+                <td>分子 = <code>样本人数 × VIP续费率</code> 或对应续费人数；分母 = <code>样本人数</code></td>
+              </tr>
+              <tr>
+                <td>VIP复购率</td>
+                <td>原始表该指标的率值（人数/样本人数）</td>
+                <td>分子 = <code>样本人数 × VIP复购率</code> 或对应复购人数；分母 = <code>样本人数</code></td>
+              </tr>
+              <tr>
+                <td>VIP 新购+续费 ARPPU</td>
+                <td><code>VIP 新购+续费 总收入 / 付费人数</code>（与报表列名一致）</td>
+                <td>
+                  与 VIP 新购 ARPPU 相同：分母 = <code>样本人数</code>；转化人数 = 同前缀下的购买/付费人数（或
+                  <code>样本人数 ×</code> 同前缀购买率）；转化收益 = 同前缀下的总收入
+                </td>
+              </tr>
+              <tr>
+                <td>VIP 新购+续费 ARPU</td>
+                <td><code>VIP 新购+续费 总收入 / 样本人数</code></td>
+                <td>
+                  与 VIP 新购 ARPU 相同：分母 = <code>样本人数</code>；转化人数 = 同前缀付费/购买人数（或率×样本）；转化收益 =
+                  同前缀总收入
+                </td>
+              </tr>
+              <tr>
+                <td>特定渠道VIP ARPU</td>
+                <td>该渠道下 <code>VIP收入 / 样本人数</code></td>
+                <td>与 VIP 新购 ARPU 相同（按该指标名称前缀匹配同系列的「人数/率/收入」列）</td>
+              </tr>
+              <tr>
+                <td>维度VIP来源 VIP ARPU</td>
+                <td>分来源 <code>VIP收入 / 样本人数</code></td>
+                <td>与 VIP 新购 ARPU 相同（前缀与列名一致即可自动联动）</td>
+              </tr>
+              <tr>
+                <td>语伴列表用户点击率</td>
+                <td>原始表率值（或点击人数/样本人数）</td>
+                <td>
+                  分子 = <code>语伴列表用户点击人数</code> 或 <code>样本人数 × 语伴列表用户点击率</code>；分母 =
+                  <code>样本人数</code>
+                </td>
               </tr>
             </tbody>
           </table>
