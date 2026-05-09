@@ -256,6 +256,7 @@ function detectGroupRole(name) {
   const raw = String(name ?? "").trim();
   const normalized = normalizeGroupName(raw);
 
+  const holdbackPatterns = [/^holdback$/, /^holdout$/, /^reserve$/];
   const controlPatterns = [
     /^control$/,
     /^对照组?$/,
@@ -268,12 +269,14 @@ function detectGroupRole(name) {
     /^test$/,
     /^true$/,
     /^实验组?\d*$/,
+    /^实验\d+$/,
     /^test\d+$/,
     /^variant[a-z0-9]*$/,
     /^treatment$/,
     /^实验$/,
   ];
 
+  if (holdbackPatterns.some((p) => p.test(normalized))) return "holdback";
   if (controlPatterns.some((p) => p.test(normalized))) return "control";
   if (experimentPatterns.some((p) => p.test(normalized))) return "experiment";
   return "other";
@@ -281,7 +284,7 @@ function detectGroupRole(name) {
 
 function sortGroups(groups) {
   return [...groups].sort((a, b) => {
-    const rolePriority = { control: 0, experiment: 1, other: 2 };
+    const rolePriority = { holdback: 0, control: 1, experiment: 2, other: 3 };
     const aRole = detectGroupRole(a);
     const bRole = detectGroupRole(b);
     const aPriority = rolePriority[aRole] ?? 99;
@@ -289,6 +292,30 @@ function sortGroups(groups) {
     if (aPriority !== bPriority) return aPriority - bPriority;
     return String(a).localeCompare(String(b), "zh-CN");
   });
+}
+
+/** 基准组 + 与其对比的若干组：有 holdback → 基准为 holdback，其余（含 control、各实验组）均与其对比；无 holdback → 基准为 control，全部实验组各自与 control 对比；再否则为第一组 vs 其余。 */
+function buildComparisonPlan(groups) {
+  const uniq = [...new Set(groups.map((g) => String(g ?? "").trim()))].filter(Boolean);
+  if (!uniq.length) return { baseline: "", variants: [] };
+
+  const sorted = sortGroups(uniq);
+  const holdbackName = sorted.find((g) => detectGroupRole(g) === "holdback");
+  if (holdbackName) {
+    const variants = sortGroups(uniq.filter((g) => g !== holdbackName));
+    return { baseline: holdbackName, variants };
+  }
+
+  const controlName = sorted.find((g) => detectGroupRole(g) === "control");
+  const experimentNames = sorted.filter((g) => detectGroupRole(g) === "experiment");
+  if (controlName && experimentNames.length) {
+    return { baseline: controlName, variants: sortGroups(experimentNames) };
+  }
+
+  if (sorted.length >= 2) {
+    return { baseline: sorted[0], variants: sorted.slice(1) };
+  }
+  return { baseline: sorted[0], variants: [] };
 }
 
 function formatMetricValue(metricName, value, isSampleRow = false) {
@@ -866,19 +893,25 @@ function renderTable(target, outputRows, mSamples) {
   target.thead.innerHTML = "";
   target.tbody.innerHTML = "";
 
+  const plans = dimensionContexts.map((c) => buildComparisonPlan(c.groups));
+
   const headerTop = document.createElement("tr");
-  headerTop.innerHTML = `
-    <th class="metric-col" rowspan="2">指标类型</th>
-    ${dimensionContexts.map((c) => `<th colspan="4">${c.label}</th>`).join("")}
-  `;
+  let headerTopHtml = `<th class="metric-col" rowspan="2">指标类型</th>`;
+  dimensionContexts.forEach((c, i) => {
+    const span = 1 + 3 * plans[i].variants.length;
+    headerTopHtml += `<th colspan="${span}">${c.label}</th>`;
+  });
+  headerTop.innerHTML = headerTopHtml;
+
   const headerSub = document.createElement("tr");
-  headerSub.innerHTML = dimensionContexts
-    .map((c) => {
-      const g0 = c.groups[0] || "-";
-      const g1 = c.groups[1] || "-";
-      return `<th class="data-col-head">${g0}</th><th class="data-col-head">${g1}</th><th class="data-col-head">uplift</th><th class="data-col-head">胜出概率</th>`;
-    })
-    .join("");
+  let headerSubHtml = "";
+  plans.forEach((plan) => {
+    headerSubHtml += `<th class="data-col-head">${plan.baseline || "-"}</th>`;
+    plan.variants.forEach((v) => {
+      headerSubHtml += `<th class="data-col-head">${v}</th><th class="data-col-head">uplift</th><th class="data-col-head">胜出概率</th>`;
+    });
+  });
+  headerSub.innerHTML = headerSubHtml;
   target.thead.appendChild(headerTop);
   target.thead.appendChild(headerSub);
 
@@ -886,32 +919,35 @@ function renderTable(target, outputRows, mSamples) {
     const tr = document.createElement("tr");
     let tds = `<td class="left">${row.label}</td>`;
 
-    dimensionContexts.forEach((ctx) => {
+    dimensionContexts.forEach((ctx, i) => {
       activeMetricMap = ctx.metricMap;
       activeSchemaRows = ctx.rows;
-      const g0 = ctx.groups[0];
-      const g1 = ctx.groups[1];
-      const v0 = g0 ? getMetricValueByGroup(row, g0) : NaN;
-      const v1 = g1 ? getMetricValueByGroup(row, g1) : NaN;
+      const plan = plans[i];
+      const baseline = plan.baseline;
+      const vBase = baseline ? getMetricValueByGroup(row, baseline) : NaN;
 
-      let upliftText = "-";
-      let probText = "-";
-      let probClass = "";
-      if (g0 && g1 && shouldComputeStats(row)) {
-        const uplift = Number.isFinite(v0) && Number.isFinite(v1) && v0 !== 0 ? v1 / v0 - 1 : NaN;
-        const probDetail = calcWinProbDetail(row, g0, g1, mSamples);
-        upliftText = formatUplift(uplift);
-        probText = formatProb(probDetail.prob, probDetail.reason);
-        probClass = getProbCellClass(probDetail.prob);
-        if (!Number.isFinite(probDetail.prob)) probClass = `${probClass} prob-error`.trim();
-      }
+      tds += `<td class="data-col">${formatMetricValue(row.label, vBase, row.type === "sample")}</td>`;
 
-      tds += `
-        <td class="data-col">${formatMetricValue(row.label, v0, row.type === "sample")}</td>
-        <td class="data-col">${formatMetricValue(row.label, v1, row.type === "sample")}</td>
+      plan.variants.forEach((variant) => {
+        const vv = getMetricValueByGroup(row, variant);
+        let upliftText = "-";
+        let probText = "-";
+        let probClass = "";
+        if (baseline && variant && shouldComputeStats(row)) {
+          const uplift =
+            Number.isFinite(vBase) && Number.isFinite(vv) && vBase !== 0 ? vv / vBase - 1 : NaN;
+          const probDetail = calcWinProbDetail(row, baseline, variant, mSamples);
+          upliftText = formatUplift(uplift);
+          probText = formatProb(probDetail.prob, probDetail.reason);
+          probClass = getProbCellClass(probDetail.prob);
+          if (!Number.isFinite(probDetail.prob)) probClass = `${probClass} prob-error`.trim();
+        }
+
+        tds += `
+        <td class="data-col">${formatMetricValue(row.label, vv, row.type === "sample")}</td>
         <td class="data-col">${upliftText}</td>
-        <td class="data-col prob-cell ${probClass}">${probText}</td>
-      `;
+        <td class="data-col prob-cell ${probClass}">${probText}</td>`;
+      });
     });
 
     tr.innerHTML = tds;

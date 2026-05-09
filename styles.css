@@ -276,6 +276,8 @@ td.prob-error {
   left: 0;
   z-index: 1;
   background: #fff;
+  /* sticky 列会盖住 collapse 边框，用阴影补右侧分隔线 */
+  box-shadow: 1px 0 0 0 var(--line);
 }
 
 .result-panel table th.metric-col {

@@ -1,0 +1,12 @@
+---
+description: Shared app.js with ARPU计算 — single canonical copy + symlink mirror
+globs: app.js
+alwaysApply: false
+---
+
+# `app.js` 与 ARPU计算 同步
+
+- **唯一源码**：`/Users/sequioa/Desktop/cursor/Calculation-of-winning-probability/app.js`（本仓库）。Bayesian AB / 多实验组 / holdback 基准逻辑只在这里改。
+- **镜像**：`/Users/sequioa/Desktop/cursor/ARPU计算/app.js` 为指向上述文件的 **符号链接**，修改本文件后 ARPU 仓库会自动一致，勿在 ARPU 侧单独复制一份 `app.js`。
+- **对比规则**：无 `holdback` 时基准为 **control**，所有识别为实验组的 arm 各自相对 control 展示 uplift 与胜出概率；存在 `holdback` 时基准为 **holdback**，其余含 control 在内的所有组均相对 holdback。
+- 若 symlink 丢失（例如解压备份目录），可运行 `./scripts/sync-app-js-to-arpu.sh` 恢复镜像或重新执行：`ln -sf ../Calculation-of-winning-probability/app.js ../ARPU计算/app.js`（路径按实际目录调整）。
